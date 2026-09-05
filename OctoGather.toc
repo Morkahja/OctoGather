@@ -1,0 +1,9 @@
+## Interface: 11200
+## Title: Octo Gather
+## Notes: Learns herb locations and colors map markers by Herbalism difficulty.
+## Author: Local
+## Version: 0.2.6
+## SavedVariables: OctoGatherDB
+## OptionalDeps: Interact
+
+OctoGather.lua
