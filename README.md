@@ -21,6 +21,9 @@ the same database and the locations remain available after logout or `/reload`.
 - Marker colors are recalculated from the current character's Herbalism,
   Mining, Skinning, or Lockpicking skill. Ordinary treasure chests compare
   their chest tier with character level.
+- Profession markers are only displayed when the current character has the
+  corresponding profession or skill. Their account-wide saved locations are
+  retained when playing a character without that profession.
 - Custom resources can learn their requirement when the tooltip includes a
   `Requires Herbalism (N)`, `Requires Mining (N)`, or similar line.
 

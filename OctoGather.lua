@@ -292,6 +292,15 @@ local function GetSkillRank(skillName)
     return 0
 end
 
+local function GetResourceSkillRanks()
+    return {
+        herb = GetSkillRank("Herbalism"),
+        mineral = GetSkillRank("Mining"),
+        skin = GetSkillRank("Skinning"),
+        lock = GetSkillRank("Lockpicking"),
+    }
+end
+
 local function GetHerbalismSkill()
     return GetSkillRank("Herbalism")
 end
@@ -322,7 +331,7 @@ local function RequirementFor(kind, name)
     return nil
 end
 
-local function NodeDifficulty(node)
+local function NodeDifficulty(node, skillRanks)
     local kind = node.kind or "herb"
     local required = node.required or RequirementFor(kind, node.name)
     if kind == "treasure" then
@@ -330,13 +339,17 @@ local function NodeDifficulty(node)
     end
     local skillName = resourceSkills[kind]
     if not skillName then return "unknown" end
-    return Difficulty(required, GetSkillRank(skillName))
+    local skill = skillRanks and skillRanks[kind] or GetSkillRank(skillName)
+    return Difficulty(required, skill)
 end
 
-local function ShouldShowNode(node)
-    if (node.kind or "herb") ~= "lock" then return true end
-    local className, classToken = UnitClass("player")
-    return className == "Rogue" or classToken == "ROGUE"
+local function ShouldShowNode(node, skillRanks)
+    local kind = node.kind or "herb"
+    if kind == "treasure" then return true end
+    local skillName = resourceSkills[kind]
+    local skill = skillRanks and skillRanks[kind] or
+        (skillName and GetSkillRank(skillName))
+    return skill and skill > 0
 end
 
 local function IsMinimapIndoors()
@@ -856,6 +869,7 @@ local function UpdatePins()
     local localScale = zoneScale[zoneName]
     local radius = Minimap:GetWidth() / 2 - 5
     local groups = {}
+    local skillRanks = GetResourceSkillRanks()
     local i
     for i = 1, table.getn(nodes) do
         local node = nodes[i]
@@ -868,8 +882,8 @@ local function UpdatePins()
             offsetY = (node.y - playerY) * localScale * minimapScale[2]
         end
         local distance = math.sqrt(offsetX * offsetX + offsetY * offsetY)
-        if distance <= radius and ShouldShowNode(node) then
-            local difficulty = NodeDifficulty(node)
+        if distance <= radius and ShouldShowNode(node, skillRanks) then
+            local difficulty = NodeDifficulty(node, skillRanks)
             AddMarkerGroup(groups, offsetX, -offsetY, difficulty, node.name,
                 node.kind or "herb", node.texture)
         end
@@ -913,13 +927,14 @@ local function UpdateWorldMapPins()
     end
 
     local groups = {}
+    local skillRanks = GetResourceSkillRanks()
     local i
     for i = 1, table.getn(nodes) do
         local node = nodes[i]
-        if ShouldShowNode(node) then
+        if ShouldShowNode(node, skillRanks) then
             local x = node.x * width
             local y = -node.y * height
-            local difficulty = NodeDifficulty(node)
+            local difficulty = NodeDifficulty(node, skillRanks)
             AddMarkerGroup(groups, x, y, difficulty, node.name,
                 node.kind or "herb", node.texture)
         end
