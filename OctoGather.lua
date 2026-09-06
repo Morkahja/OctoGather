@@ -1,7 +1,7 @@
 -- Octo Gather - self-learning Herbalism map markers for Vanilla 1.12.
 
 local ADDON = "Octo Gather"
-local MAX_PINS = 100
+local MAX_PINS = 300
 local UPDATE_INTERVAL = 0.10
 local DUPLICATE_DISTANCE = 0.004 -- 0.4 map percentage points, as used by classic Gatherer.
 
@@ -12,8 +12,12 @@ local worldMapCheckbox = nil
 local elapsedSinceUpdate = 0
 local pendingNode = nil
 local pendingRequirement = nil
+local pendingKind = nil
+local pendingTexture = nil
 local pendingGather = false
+local pendingLootUntil = 0
 local lastRecordedName = nil
+local lastRecordedKind = nil
 local lastRecordedTime = 0
 local lastInteractTime = 0
 local originalInteract = nil
@@ -98,8 +102,8 @@ local continentScale = {
     },
 }
 
--- Minimum gathering requirements. Unknown/custom OctoWoW herbs learn their
--- requirement from the node tooltip and save it with the recorded location.
+-- Minimum gathering requirements. Unknown/custom OctoWoW resources learn
+-- their requirement from the object tooltip and save it with the location.
 local herbRequirements = {
     ["Peacebloom"] = 1, ["Silverleaf"] = 1, ["Earthroot"] = 15,
     ["Mageroyal"] = 50, ["Briarthorn"] = 70, ["Stranglekelp"] = 85,
@@ -111,6 +115,70 @@ local herbRequirements = {
     ["Gromsblood"] = 250, ["Golden Sansam"] = 260, ["Dreamfoil"] = 270,
     ["Mountain Silversage"] = 280, ["Plaguebloom"] = 285, ["Icecap"] = 290,
     ["Black Lotus"] = 300,
+}
+
+local mineralRequirements = {
+    ["Copper Vein"] = 1,
+    ["Ooze Covered Copper Vein"] = 1,
+    ["Tin Vein"] = 65,
+    ["Ooze Covered Tin Vein"] = 65,
+    ["Silver Vein"] = 75,
+    ["Ooze Covered Silver Vein"] = 75,
+    ["Iron Deposit"] = 125,
+    ["Ooze Covered Iron Deposit"] = 125,
+    ["Gold Vein"] = 155,
+    ["Ooze Covered Gold Vein"] = 155,
+    ["Mithril Deposit"] = 175,
+    ["Ooze Covered Mithril Deposit"] = 175,
+    ["Truesilver Deposit"] = 230,
+    ["Ooze Covered Truesilver Deposit"] = 230,
+    ["Dark Iron Deposit"] = 230,
+    ["Small Thorium Vein"] = 245,
+    ["Ooze Covered Thorium Vein"] = 245,
+    ["Rich Thorium Vein"] = 275,
+    ["Ooze Covered Rich Thorium Vein"] = 275,
+    ["Hakkari Thorium Vein"] = 275,
+    ["Small Obsidian Chunk"] = 305,
+    ["Large Obsidian Chunk"] = 305,
+}
+
+local miningLootNodes = {
+    ["Copper Ore"] = "Copper Vein",
+    ["Tin Ore"] = "Tin Vein",
+    ["Silver Ore"] = "Silver Vein",
+    ["Iron Ore"] = "Iron Deposit",
+    ["Gold Ore"] = "Gold Vein",
+    ["Mithril Ore"] = "Mithril Deposit",
+    ["Truesilver Ore"] = "Truesilver Deposit",
+    ["Dark Iron Ore"] = "Dark Iron Deposit",
+    -- Thorium Ore alone cannot tell us whether Interact used a Small or Rich
+    -- vein, so keep the generic fallback purple instead of guessing wrongly.
+    ["Thorium Ore"] = "Thorium Vein",
+    ["Small Obsidian Shard"] = "Small Obsidian Chunk",
+    ["Large Obsidian Shard"] = "Large Obsidian Chunk",
+}
+
+-- Ordinary treasure chests have no skill requirement in the client tooltip.
+-- These levels represent the chest tier, so their color follows character
+-- level instead of a profession. Unknown/custom chest tiers remain purple.
+local treasureLevels = {
+    ["Battered Chest"] = 5,
+    ["Tattered Chest"] = 15,
+    ["Solid Chest"] = 20,
+    ["Large Battered Chest"] = 25,
+    ["Large Iron Bound Chest"] = 30,
+    ["Large Solid Chest"] = 35,
+    ["Buccaneer's Strongbox"] = 40,
+    ["Bound Chest"] = 45,
+    ["Large Mithril Bound Chest"] = 50,
+    ["Large Darkwood Chest"] = 55,
+}
+
+local resourceSkills = {
+    herb = "Herbalism",
+    mineral = "Mining",
+    skin = "Skinning",
+    lock = "Lockpicking",
 }
 
 local iconRoot = "Interface\\AddOns\\OctoGather\\Icons\\"
@@ -145,6 +213,29 @@ local herbIcons = {
     ["Black Lotus"] = iconRoot .. "HerbBlackLotus",
 }
 
+local mineralIcons = {
+    ["Copper Vein"] = "Interface\\Icons\\INV_Ore_Copper_01",
+    ["Tin Vein"] = "Interface\\Icons\\INV_Ore_Tin_01",
+    ["Silver Vein"] = "Interface\\Icons\\INV_Ore_Thorium_01",
+    ["Iron Deposit"] = "Interface\\Icons\\INV_Ore_Iron_01",
+    ["Gold Vein"] = "Interface\\Icons\\INV_Ore_Gold_01",
+    ["Mithril Deposit"] = "Interface\\Icons\\INV_Ore_Mithril_02",
+    ["Truesilver Deposit"] = "Interface\\Icons\\INV_Ore_TrueSilver_01",
+    ["Dark Iron Deposit"] = "Interface\\Icons\\INV_Ore_Mithril_01",
+    ["Small Thorium Vein"] = "Interface\\Icons\\INV_Ore_Thorium_02",
+    ["Rich Thorium Vein"] = "Interface\\Icons\\INV_Ore_Thorium_02",
+    ["Thorium Vein"] = "Interface\\Icons\\INV_Ore_Thorium_02",
+    ["Small Obsidian Chunk"] = "Interface\\Icons\\INV_Stone_15",
+    ["Large Obsidian Chunk"] = "Interface\\Icons\\INV_Stone_15",
+}
+
+local fallbackIcons = {
+    mineral = "Interface\\Icons\\INV_Pick_02",
+    skin = "Interface\\Icons\\INV_Misc_LeatherScrap_02",
+    lock = "Interface\\Icons\\INV_Misc_Key_03",
+    treasure = "Interface\\Icons\\INV_Misc_Chest_01",
+}
+
 local colors = {
     red    = { 1.00, 0.12, 0.12 },
     orange = { 1.00, 0.50, 0.00 },
@@ -162,15 +253,19 @@ local function Print(message)
     DEFAULT_CHAT_FRAME:AddMessage("|cff68cc70" .. ADDON .. ":|r " .. message)
 end
 
-local function GetHerbalismSkill()
+local function GetSkillRank(skillName)
     local i
     for i = 1, GetNumSkillLines() do
         local name, isHeader, _, rank = GetSkillLineInfo(i)
-        if not isHeader and name == "Herbalism" then
+        if not isHeader and name == skillName then
             return tonumber(rank) or 0
         end
     end
     return 0
+end
+
+local function GetHerbalismSkill()
+    return GetSkillRank("Herbalism")
 end
 
 local function Difficulty(required, skill)
@@ -180,6 +275,40 @@ local function Difficulty(required, skill)
     if skill < required + 50 then return "yellow" end
     if skill < required + 100 then return "green" end
     return "gray"
+end
+
+local function LevelDifficulty(requiredLevel, playerLevel)
+    if not requiredLevel then return "unknown" end
+    local difference = requiredLevel - playerLevel
+    if difference >= 6 then return "red" end
+    if difference >= 3 then return "orange" end
+    if difference >= -2 then return "yellow" end
+    if difference >= -9 then return "green" end
+    return "gray"
+end
+
+local function RequirementFor(kind, name)
+    if kind == "herb" then return herbRequirements[name] end
+    if kind == "mineral" then return mineralRequirements[name] end
+    if kind == "treasure" then return treasureLevels[name] end
+    return nil
+end
+
+local function NodeDifficulty(node)
+    local kind = node.kind or "herb"
+    local required = node.required or RequirementFor(kind, node.name)
+    if kind == "treasure" then
+        return LevelDifficulty(required, UnitLevel("player") or 0)
+    end
+    local skillName = resourceSkills[kind]
+    if not skillName then return "unknown" end
+    return Difficulty(required, GetSkillRank(skillName))
+end
+
+local function ShouldShowNode(node)
+    if (node.kind or "herb") ~= "lock" then return true end
+    local className, classToken = UnitClass("player")
+    return className == "Rogue" or classToken == "ROGUE"
 end
 
 local function IsMinimapIndoors()
@@ -238,21 +367,48 @@ local function GetPosition(forceMap)
     return continent, zone, zoneName, x, y
 end
 
-local function ReadNodeTooltip()
+local function ReadNodeTooltip(skillName)
     local name = GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText()
     if not name or name == "" then return nil, nil end
 
-    local required = herbRequirements[name]
+    local required = nil
     local i
     for i = 2, GameTooltip:NumLines() do
         local line = getglobal("GameTooltipTextLeft" .. i)
         local text = line and line:GetText()
-        if text and string.find(text, "Herbalism") then
+        if text and (not skillName or string.find(text, skillName)) then
             local _, _, number = string.find(text, "%((%d+)%)")
             if number then required = tonumber(number) end
         end
     end
     return name, required
+end
+
+local function IsChestName(name)
+    if not name then return false end
+    return string.find(name, "Chest") or string.find(name, "Footlocker") or
+        string.find(name, "Coffer") or string.find(name, "Strongbox") or
+        string.find(name, "Treasure") or string.find(name, "Cache")
+end
+
+local function SkinningRequirement(level)
+    level = tonumber(level)
+    if not level or level <= 0 then return nil end
+    if level <= 10 then return math.max(1, (level - 1) * 10) end
+    return level * 5
+end
+
+local function LootItem(message)
+    if not message then return nil, nil end
+    local _, _, link = string.find(message, "(|c%x+|Hitem:.-|h%[[^%]]+%]|h|r)")
+    local _, _, name = string.find(message, "%[([^%]]+)%]")
+    local texture = nil
+    if link and GetItemInfo then
+        local itemName, itemLink, quality, itemLevel, itemType, itemSubType,
+            stackCount, equipSlot, itemTexture = GetItemInfo(link)
+        texture = itemTexture
+    end
+    return name, texture
 end
 
 local function DatabaseZone(continent, zone, create)
@@ -261,15 +417,16 @@ local function DatabaseZone(continent, zone, create)
     return OctoGatherDB.nodes[key], key
 end
 
-local function RecordNode(name, required)
+local function RecordNode(name, required, kind, texture)
     if not name or name == "" then return end
+    kind = kind or "herb"
     local continent, zone, zoneName, x, y = GetPosition(true)
     if not continent then
         Print("Could not read your map position; this zone may need OctoWoW map data.")
         return
     end
 
-    required = required or herbRequirements[name]
+    required = required or RequirementFor(kind, name)
     local areaName = GetSubZoneText and GetSubZoneText() or ""
     if GetMinimapZoneText then
         local minimapName = GetMinimapZoneText()
@@ -279,12 +436,15 @@ local function RecordNode(name, required)
     local i
     for i = 1, table.getn(nodes) do
         local node = nodes[i]
-        if node.name == name and math.abs(node.x - x) <= DUPLICATE_DISTANCE and
+        if (node.kind or "herb") == kind and node.name == name and
+                math.abs(node.x - x) <= DUPLICATE_DISTANCE and
                 math.abs(node.y - y) <= DUPLICATE_DISTANCE then
             node.x = (node.x * node.count + x) / (node.count + 1)
             node.y = (node.y * node.count + y) / (node.count + 1)
             node.count = node.count + 1
             if required then node.required = required end
+            if texture then node.texture = texture end
+            node.kind = kind
             node.zoneName = zoneName
             node.areaName = areaName
             return
@@ -293,7 +453,8 @@ local function RecordNode(name, required)
 
     table.insert(nodes, {
         name = name, required = required, x = x, y = y,
-        count = 1, zoneName = zoneName, areaName = areaName,
+        kind = kind, texture = texture, count = 1,
+        zoneName = zoneName, areaName = areaName,
     })
     local location = zoneName
     if areaName and areaName ~= "" and areaName ~= zoneName then
@@ -303,10 +464,13 @@ local function RecordNode(name, required)
         math.floor(x * 1000) / 10 .. ", " .. math.floor(y * 1000) / 10 .. ".")
 end
 
-local function RecordNodeOnce(name, required)
+local function RecordNodeOnce(name, required, kind, texture)
+    kind = kind or "herb"
     local now = GetTime()
-    if lastRecordedName == name and now - lastRecordedTime < 2 then return end
-    RecordNode(name, required)
+    if lastRecordedKind == kind and lastRecordedName == name and
+            now - lastRecordedTime < 2 then return end
+    RecordNode(name, required, kind, texture)
+    lastRecordedKind = kind
     lastRecordedName = name
     lastRecordedTime = now
 end
@@ -322,12 +486,65 @@ local function InstallInteractHook()
     Interact = interactWrapper
 end
 
-local function HerbNameFromLootMessage(message)
-    if not message then return nil end
-    local _, _, name = string.find(message, "%[([^%]]+)%]")
+local function ResourceFromLootMessage(message)
+    local name, texture = LootItem(message)
     if not name then return nil end
-    if herbRequirements[name] then return name end
+    if herbRequirements[name] then
+        return "herb", name, herbRequirements[name], texture
+    end
+    local nodeName = miningLootNodes[name]
+    if nodeName then
+        return "mineral", nodeName, mineralRequirements[nodeName], texture
+    end
     return nil
+end
+
+local actionKinds = {
+    ["Herb Gathering"] = "herb",
+    ["Mining"] = "mineral",
+    ["Skinning"] = "skin",
+    ["Opening"] = "treasure",
+    ["Pick Lock"] = "lock",
+}
+
+local function ClearPending()
+    pendingNode = nil
+    pendingRequirement = nil
+    pendingKind = nil
+    pendingTexture = nil
+    pendingGather = false
+    pendingLootUntil = 0
+end
+
+local function BeginResourceAction(actionName)
+    ClearPending()
+    local kind = actionKinds[actionName]
+    if not kind then return false end
+
+    local name, required
+    if kind == "herb" then
+        name, required = ReadNodeTooltip("Herbalism")
+        required = required or herbRequirements[name]
+    elseif kind == "mineral" then
+        name, required = ReadNodeTooltip("Mining")
+        required = required or mineralRequirements[name]
+    elseif kind == "skin" then
+        name = UnitName("target") or "Skinnable creature"
+        required = SkinningRequirement(UnitLevel("target"))
+    else
+        name, required = ReadNodeTooltip("Lockpicking")
+        if not IsChestName(name) then return false end
+        if kind == "treasure" and required then kind = "lock" end
+        required = required or RequirementFor(kind, name)
+    end
+
+    pendingNode = name
+    pendingRequirement = required
+    pendingKind = kind
+    pendingTexture = nil
+    pendingGather = true
+    pendingLootUntil = 0
+    return true
 end
 
 local function SetPinColor(pin, color)
@@ -437,8 +654,15 @@ local function AddSolidEdge(pin)
     table.insert(pin.edges, texture)
 end
 
-local function GetHerbIcon(name)
-    return herbIcons[name] or herbIcons["Peacebloom"]
+local function GetResourceIcon(name, kind, texture)
+    if texture then return texture end
+    kind = kind or "herb"
+    if kind == "herb" then return herbIcons[name] or herbIcons["Peacebloom"] end
+    if kind == "mineral" then
+        local baseName = string.gsub(name or "", "^Ooze Covered ", "")
+        return mineralIcons[name] or mineralIcons[baseName] or fallbackIcons.mineral
+    end
+    return fallbackIcons[kind] or fallbackIcons.treasure
 end
 
 local function SetPinBounds(pin, left, right, bottom, top, anchorParent, anchorPoint)
@@ -521,14 +745,16 @@ local function BoundsOverlap(a, b)
         a.bottom <= b.top and a.top >= b.bottom
 end
 
-local function AddMarkerGroup(groups, x, y, difficulty, herbName)
+local function AddMarkerGroup(groups, x, y, difficulty, resourceName, kind, texture)
+    kind = kind or "herb"
     local group = {
         left = x - 7, right = x + 7, bottom = y - 7, top = y + 7,
         difficulty = difficulty,
-        iconName = herbName,
+        resourceKey = kind .. ":" .. (resourceName or ""),
+        iconTexture = GetResourceIcon(resourceName, kind, texture),
         names = {},
     }
-    if herbName then group.names[herbName] = true end
+    if resourceName then group.names[resourceName] = true end
 
     -- Recheck after every expansion so chains of overlapping markers become
     -- one group even when the first and last markers do not touch directly.
@@ -538,7 +764,7 @@ local function AddMarkerGroup(groups, x, y, difficulty, herbName)
         local i
         for i = table.getn(groups), 1, -1 do
             local other = groups[i]
-            if group.iconName == other.iconName and BoundsOverlap(group, other) then
+            if group.resourceKey == other.resourceKey and BoundsOverlap(group, other) then
                 local name
                 for name in pairs(other.names) do group.names[name] = true end
                 group.left = math.min(group.left, other.left)
@@ -594,7 +820,6 @@ local function UpdatePins()
     if not exactSize and not minimapScale then HidePinsAfter(1) return end
     if exactSize and not zoomYards then HidePinsAfter(1) return end
 
-    local skill = GetHerbalismSkill()
     local localScale = zoneScale[zoneName]
     local radius = Minimap:GetWidth() / 2 - 5
     local groups = {}
@@ -610,9 +835,10 @@ local function UpdatePins()
             offsetY = (node.y - playerY) * localScale * minimapScale[2]
         end
         local distance = math.sqrt(offsetX * offsetX + offsetY * offsetY)
-        if distance <= radius then
-            local difficulty = Difficulty(node.required or herbRequirements[node.name], skill)
-            AddMarkerGroup(groups, offsetX, -offsetY, difficulty, node.name)
+        if distance <= radius and ShouldShowNode(node) then
+            local difficulty = NodeDifficulty(node)
+            AddMarkerGroup(groups, offsetX, -offsetY, difficulty, node.name,
+                node.kind or "herb", node.texture)
         end
     end
 
@@ -653,15 +879,17 @@ local function UpdateWorldMapPins()
         return
     end
 
-    local skill = GetHerbalismSkill()
     local groups = {}
     local i
     for i = 1, table.getn(nodes) do
         local node = nodes[i]
-        local x = node.x * width
-        local y = -node.y * height
-        local difficulty = Difficulty(node.required or herbRequirements[node.name], skill)
-        AddMarkerGroup(groups, x, y, difficulty, node.name)
+        if ShouldShowNode(node) then
+            local x = node.x * width
+            local y = -node.y * height
+            local difficulty = NodeDifficulty(node)
+            AddMarkerGroup(groups, x, y, difficulty, node.name,
+                node.kind or "herb", node.texture)
+        end
     end
 
     local shown = math.min(table.getn(groups), MAX_PINS)
@@ -669,7 +897,7 @@ local function UpdateWorldMapPins()
         local group = groups[i]
         local pin = AcquireWorldPin(i)
         SetMarkerNames(pin, group.names)
-        pin.icon:SetTexture(GetHerbIcon(group.iconName))
+        pin.icon:SetTexture(group.iconTexture)
         SetPinColor(pin, colors[group.difficulty])
         pin:SetAlpha(group.difficulty == "gray" and 0.5 or 1.0)
         SetPinBounds(pin, group.left, group.right, group.bottom, group.top,
@@ -705,17 +933,34 @@ local function InitializeDatabase()
     if type(OctoGatherDB.nodes) ~= "table" then OctoGatherDB.nodes = {} end
     if OctoGatherDB.enabled == nil then OctoGatherDB.enabled = true end
     if OctoGatherDB.worldMapEnabled == nil then OctoGatherDB.worldMapEnabled = true end
-    OctoGatherDB.version = 1
+    -- Version 1 databases contained herbs only. Mark them explicitly so the
+    -- shared node table can safely hold mining, skinning, and chest locations.
+    if not OctoGatherDB.version or OctoGatherDB.version < 2 then
+        local _, zoneNodes
+        for _, zoneNodes in pairs(OctoGatherDB.nodes) do
+            local i
+            for i = 1, table.getn(zoneNodes) do
+                if not zoneNodes[i].kind then zoneNodes[i].kind = "herb" end
+            end
+        end
+    end
+    OctoGatherDB.version = 2
     CreateWorldMapCheckbox()
     if worldMapCheckbox then worldMapCheckbox:SetChecked(OctoGatherDB.worldMapEnabled) end
 end
 
 local function ShowStatus()
     local zones, nodes = 0, 0
+    local counts = { herb = 0, mineral = 0, skin = 0, lock = 0, treasure = 0 }
     local _, zoneNodes
     for _, zoneNodes in pairs(OctoGatherDB.nodes) do
         zones = zones + 1
         nodes = nodes + table.getn(zoneNodes)
+        local i
+        for i = 1, table.getn(zoneNodes) do
+            local kind = zoneNodes[i].kind or "herb"
+            counts[kind] = (counts[kind] or 0) + 1
+        end
     end
     local continent, zone, zoneName = FindCurrentMapZone()
     local currentNodes = 0
@@ -725,9 +970,13 @@ local function ShowStatus()
         currentNodes = zoneNodes and table.getn(zoneNodes) or 0
         supported = zoneScale[zoneName] or customZoneSize[zoneName]
     end
-    Print((OctoGatherDB.enabled and "rings enabled" or "rings hidden") .. "; " ..
-        nodes .. " herb locations saved in " .. zones .. " zones; Herbalism " ..
-        GetHerbalismSkill() .. ".")
+    Print((OctoGatherDB.enabled and "markers enabled" or "markers hidden") .. "; " ..
+        nodes .. " locations in " .. zones .. " zones (herbs " .. counts.herb ..
+        ", minerals " .. counts.mineral .. ", skins " .. counts.skin ..
+        ", chests " .. (counts.lock + counts.treasure) .. ").")
+    Print("skills: Herbalism " .. GetSkillRank("Herbalism") .. ", Mining " ..
+        GetSkillRank("Mining") .. ", Skinning " .. GetSkillRank("Skinning") ..
+        ", Lockpicking " .. GetSkillRank("Lockpicking") .. ".")
     if continent and zone then
         Print("current map " .. continent .. ":" .. zone .. " (" .. zoneName .. ") has " .. currentNodes ..
             " saved nodes; minimap scaling " .. (supported and "supported." or "NOT supported."))
@@ -759,35 +1008,75 @@ frame:SetScript("OnEvent", function()
         InitializeDatabase()
         UpdatePins()
         UpdateWorldMapPins()
-    elseif event == "SPELLCAST_START" and arg1 == "Herb Gathering" then
-        pendingNode, pendingRequirement = ReadNodeTooltip()
-        -- Interact.dll starts the native gather without first placing the world
-        -- object under GameTooltip, so the cast itself is enough to arm us.
-        pendingGather = true
+    elseif event == "SPELLCAST_START" and actionKinds[arg1] then
+        -- Interact.dll can start the native action without first placing the
+        -- world object under GameTooltip. The success message or resulting
+        -- loot fills in names that were unavailable when the cast began.
+        BeginResourceAction(arg1)
     elseif event == "CHAT_MSG_SPELL_SELF_BUFF" and arg1 then
-        local _, _, gatheredName = string.find(arg1, "^You perform Herb Gathering on (.+)%.$")
-        if gatheredName then
-            RecordNodeOnce(gatheredName, herbRequirements[gatheredName] or
-                (pendingNode == gatheredName and pendingRequirement or nil))
-            pendingNode, pendingRequirement, pendingGather = nil, nil, false
+        local _, _, actionName, gatheredName =
+            string.find(arg1, "^You perform (.+) on (.+)%.$")
+        local kind = actionKinds[actionName]
+        if kind == "herb" or kind == "mineral" then
+            local required = RequirementFor(kind, gatheredName)
+            if pendingNode == gatheredName and pendingRequirement then
+                required = pendingRequirement
+            end
+            RecordNodeOnce(gatheredName, required, kind, pendingTexture)
+            ClearPending()
+            UpdatePins()
+        elseif kind == "skin" then
+            pendingKind = "skin"
+            pendingNode = gatheredName
+            if not pendingRequirement then
+                pendingRequirement = SkinningRequirement(UnitLevel("target"))
+            end
+            pendingGather = false
+            pendingLootUntil = GetTime() + 5
+        elseif (kind == "treasure" or kind == "lock") and IsChestName(gatheredName) then
+            if kind == "treasure" and pendingRequirement then kind = "lock" end
+            RecordNodeOnce(gatheredName,
+                pendingRequirement or RequirementFor(kind, gatheredName), kind,
+                pendingTexture)
+            ClearPending()
             UpdatePins()
         end
-    elseif event == "CHAT_MSG_LOOT" and GetTime() - lastInteractTime < 10 then
-        local gatheredName = HerbNameFromLootMessage(arg1)
-        if gatheredName then
-            RecordNodeOnce(gatheredName, herbRequirements[gatheredName])
-            lastInteractTime = 0
-            pendingNode, pendingRequirement, pendingGather = nil, nil, false
-            UpdatePins()
+    elseif event == "CHAT_MSG_LOOT" then
+        if pendingKind == "skin" and
+                (pendingGather or GetTime() <= pendingLootUntil) then
+            local itemName, itemTexture = LootItem(arg1)
+            if itemName then
+                RecordNodeOnce(itemName, pendingRequirement, "skin", itemTexture)
+                pendingLootUntil = GetTime() + 2
+                UpdatePins()
+            end
+        elseif GetTime() - lastInteractTime < 10 then
+            local kind, resourceName, required, texture =
+                ResourceFromLootMessage(arg1)
+            if kind then
+                RecordNodeOnce(resourceName, required, kind, texture)
+                lastInteractTime = 0
+                ClearPending()
+                UpdatePins()
+            end
         end
     elseif event == "SPELLCAST_STOP" and pendingGather then
-        -- Normal right-click gathering supplies a tooltip. This remains a
-        -- fallback for clients that do not print the successful gather line.
-        if pendingNode then RecordNodeOnce(pendingNode, pendingRequirement) end
-        pendingNode, pendingRequirement, pendingGather = nil, nil, false
-        UpdatePins()
+        if pendingKind == "skin" then
+            pendingGather = false
+            pendingLootUntil = GetTime() + 5
+        elseif pendingNode then
+            RecordNodeOnce(pendingNode, pendingRequirement, pendingKind,
+                pendingTexture)
+            ClearPending()
+            UpdatePins()
+        else
+            -- Keep Interact armed briefly; a loot message may still identify
+            -- an herb or mineral even when no object tooltip was available.
+            pendingGather = false
+            pendingLootUntil = GetTime() + 10
+        end
     elseif event == "SPELLCAST_FAILED" or event == "SPELLCAST_INTERRUPTED" then
-        pendingNode, pendingRequirement, pendingGather = nil, nil, false
+        ClearPending()
     elseif event == "WORLD_MAP_UPDATE" then
         UpdateWorldMapPins()
     elseif event == "SKILL_LINES_CHANGED" or event == "MINIMAP_UPDATE_ZOOM" or
@@ -801,6 +1090,9 @@ frame:SetScript("OnUpdate", function()
     elapsedSinceUpdate = elapsedSinceUpdate + arg1
     if elapsedSinceUpdate >= UPDATE_INTERVAL then
         elapsedSinceUpdate = 0
+        if pendingLootUntil > 0 and GetTime() > pendingLootUntil then
+            ClearPending()
+        end
         InstallInteractHook()
         UpdatePins()
         UpdateWorldMapPins()
