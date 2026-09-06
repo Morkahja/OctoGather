@@ -30,7 +30,9 @@ the same database and the locations remain available after logout or `/reload`.
 - **Mining:** saves ore veins and deposits and compares them with Mining.
 - **Skinning:** saves the leather, hide, scale, or other item actually obtained
   and compares the skinned creature's requirement with Skinning. These markers
-  are hunting spots rather than exact spawn points because creatures move.
+  are hunting spots rather than exact spawn points because creatures move. The
+  requirement follows Vanilla's low-level and high-level creature formulas, so
+  the outline changes as the character's Skinning skill increases.
 - **Lockpicking:** saves world chests that expose a Lockpicking requirement and
   compares them with the rogue's Lockpicking skill. These markers are only
   displayed while playing a rogue.

@@ -394,7 +394,11 @@ end
 local function SkinningRequirement(level)
     level = tonumber(level)
     if not level or level <= 0 then return nil end
-    if level <= 10 then return math.max(1, (level - 1) * 10) end
+    -- Vanilla uses two ranges for the highest creature level that can be
+    -- skinned: skill / 10 + 10 through skill 100, then skill / 5. Inverting
+    -- that rule gives the minimum Skinning skill used by the color bands.
+    if level <= 10 then return 1 end
+    if level <= 20 then return (level - 10) * 10 end
     return level * 5
 end
 
@@ -933,9 +937,10 @@ local function InitializeDatabase()
     if type(OctoGatherDB.nodes) ~= "table" then OctoGatherDB.nodes = {} end
     if OctoGatherDB.enabled == nil then OctoGatherDB.enabled = true end
     if OctoGatherDB.worldMapEnabled == nil then OctoGatherDB.worldMapEnabled = true end
+    local databaseVersion = tonumber(OctoGatherDB.version) or 1
     -- Version 1 databases contained herbs only. Mark them explicitly so the
     -- shared node table can safely hold mining, skinning, and chest locations.
-    if not OctoGatherDB.version or OctoGatherDB.version < 2 then
+    if databaseVersion < 2 then
         local _, zoneNodes
         for _, zoneNodes in pairs(OctoGatherDB.nodes) do
             local i
@@ -944,7 +949,21 @@ local function InitializeDatabase()
             end
         end
     end
-    OctoGatherDB.version = 2
+    -- Version 2 calculated the required skill incorrectly for creatures below
+    -- level 21. Keep every saved hunting spot, but discard only its unreliable
+    -- requirement; skinning there again restores the correct dynamic color.
+    if databaseVersion < 3 then
+        local _, zoneNodes
+        for _, zoneNodes in pairs(OctoGatherDB.nodes) do
+            local i
+            for i = 1, table.getn(zoneNodes) do
+                if zoneNodes[i].kind == "skin" then
+                    zoneNodes[i].required = nil
+                end
+            end
+        end
+    end
+    OctoGatherDB.version = 3
     CreateWorldMapCheckbox()
     if worldMapCheckbox then worldMapCheckbox:SetChecked(OctoGatherDB.worldMapEnabled) end
 end
