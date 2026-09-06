@@ -229,6 +229,34 @@ local mineralIcons = {
     ["Large Obsidian Chunk"] = "Interface\\Icons\\INV_Stone_15",
 }
 
+-- GetItemInfo can return no texture when an item is not cached yet. Keep the
+-- Vanilla Skinning materials explicit so that falling back never makes a low-
+-- level leather look like Rugged Leather.
+local skinIcons = {
+    ["Ruined Leather Scraps"] = "Interface\\Icons\\INV_Misc_Pelt_Bear_Ruin_05",
+    ["Light Leather"] = "Interface\\Icons\\INV_Misc_LeatherScrap_03",
+    ["Light Hide"] = "Interface\\Icons\\INV_Misc_Pelt_Wolf_Ruin_02",
+    ["Medium Leather"] = "Interface\\Icons\\INV_Misc_LeatherScrap_05",
+    ["Medium Hide"] = "Interface\\Icons\\INV_Misc_Pelt_Boar_Ruin_02",
+    ["Heavy Leather"] = "Interface\\Icons\\INV_Misc_LeatherScrap_07",
+    ["Heavy Hide"] = "Interface\\Icons\\INV_Misc_Pelt_Wolf_Ruin_03",
+    ["Thick Leather"] = "Interface\\Icons\\INV_Misc_LeatherScrap_08",
+    ["Thick Hide"] = "Interface\\Icons\\INV_Misc_Pelt_Bear_Ruin_01",
+    ["Rugged Leather"] = "Interface\\Icons\\INV_Misc_LeatherScrap_02",
+    ["Rugged Hide"] = "Interface\\Icons\\INV_Misc_Pelt_Bear_Ruin_02",
+    ["Thin Kodo Leather"] = "Interface\\Icons\\INV_Misc_LeatherScrap_06",
+    ["Thick Wolfhide"] = "Interface\\Icons\\INV_Misc_Pelt_02",
+    ["Shadowcat Hide"] = "Interface\\Icons\\INV_Misc_Pelt_01",
+    ["Warbear Leather"] = "Interface\\Icons\\INV_Misc_Pelt_Bear_Ruin_05",
+    ["Frostsaber Leather"] = "Interface\\Icons\\INV_Misc_Pelt_06",
+    ["Chimera Leather"] = "Interface\\Icons\\INV_Misc_LeatherScrap_01",
+    ["Devilsaur Leather"] = "Interface\\Icons\\INV_Misc_Pelt_03",
+    ["Primal Bat Leather"] = "Interface\\Icons\\INV_Misc_Pelt_01",
+    ["Primal Tiger Leather"] = "Interface\\Icons\\INV_Misc_Pelt_04",
+    ["Core Leather"] = "Interface\\Icons\\INV_Ammo_FireTar",
+    ["Pristine Hide of the Beast"] = "Interface\\Icons\\INV_Misc_MonsterScales_15",
+}
+
 local fallbackIcons = {
     mineral = "Interface\\Icons\\INV_Pick_02",
     skin = "Interface\\Icons\\INV_Misc_LeatherScrap_02",
@@ -659,8 +687,9 @@ local function AddSolidEdge(pin)
 end
 
 local function GetResourceIcon(name, kind, texture)
-    if texture then return texture end
     kind = kind or "herb"
+    if kind == "skin" and skinIcons[name] then return skinIcons[name] end
+    if texture then return texture end
     if kind == "herb" then return herbIcons[name] or herbIcons["Peacebloom"] end
     if kind == "mineral" then
         local baseName = string.gsub(name or "", "^Ooze Covered ", "")

@@ -32,7 +32,9 @@ the same database and the locations remain available after logout or `/reload`.
   and compares the skinned creature's requirement with Skinning. These markers
   are hunting spots rather than exact spawn points because creatures move. The
   requirement follows Vanilla's low-level and high-level creature formulas, so
-  the outline changes as the character's Skinning skill increases.
+  the outline changes as the character's Skinning skill increases. Known
+  Vanilla leathers and hides always use their exact inventory icons, even when
+  the client has not cached the looted item's texture yet.
 - **Lockpicking:** saves world chests that expose a Lockpicking requirement and
   compares them with the rogue's Lockpicking skill. These markers are only
   displayed while playing a rogue.
