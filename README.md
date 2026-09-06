@@ -1,10 +1,10 @@
 # Octo Gather
 
 Octo Gather is a self-learning resource map overlay for OctoWoW and Vanilla
-WoW 1.12. It remembers successfully gathered herbs and minerals, skinning
-results, lockpicking practice chests, and ordinary treasure chests. Saved
-locations appear as difficulty-colored outlines on the minimap and as resource
-icons with colored outlines on the world map.
+WoW 1.12. It remembers successfully gathered herbs, minerals, and Survival
+trees, plus skinning results, lockpicking practice chests, and ordinary treasure
+chests. Saved locations appear as difficulty-colored outlines on the minimap
+and as resource icons with colored outlines on the world map.
 
 Locations are saved account-wide in `OctoGatherDB`, so every character can use
 the same database and the locations remain available after logout or `/reload`.
@@ -13,14 +13,14 @@ the same database and the locations remain available after logout or `/reload`.
 
 ## How it works
 
-- Successfully gather, mine, skin, or open a chest to teach Octo Gather the
-  resource and position.
+- Successfully gather, mine, cut a tree, skin, or open a chest to teach Octo
+  Gather the resource and position.
 - Normal interaction and the
   [Interact](https://github.com/lookino/Interact) hotkey are supported.
 - Each location records its main map zone and the smaller minimap subzone name.
 - Marker colors are recalculated from the current character's Herbalism,
-  Mining, Skinning, or Lockpicking skill. Ordinary treasure chests compare
-  their chest tier with character level.
+  Mining, Survival, Skinning, or Lockpicking skill. Ordinary treasure chests
+  compare their chest tier with character level.
 - Profession markers are only displayed when the current character has the
   corresponding profession or skill. Their account-wide saved locations are
   retained when playing a character without that profession.
@@ -31,6 +31,10 @@ the same database and the locations remain available after logout or `/reload`.
 
 - **Herbalism:** saves the herb node and compares it with Herbalism.
 - **Mining:** saves ore veins and deposits and compares them with Mining.
+- **Survival:** saves Simple, Bright, Shade, Tropical, Dead, and Star Wood Trees
+  after successful Woodcutting and compares them with Survival. Markers only
+  appear on characters who know Survival; Find Trees does not need to remain
+  active after a location has been learned.
 - **Skinning:** saves the leather, hide, scale, or other item actually obtained
   and compares the skinned creature's requirement with Skinning. These markers
   are hunting spots rather than exact spawn points because creatures move. The

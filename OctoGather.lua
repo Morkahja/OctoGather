@@ -174,11 +174,29 @@ local treasureLevels = {
     ["Large Darkwood Chest"] = 55,
 }
 
+local treeRequirements = {
+    ["Simple Wood Tree"] = 5,
+    ["Bright Wood Tree"] = 125,
+    ["Shade Wood Tree"] = 175,
+    ["Tropical Wood Tree"] = 225,
+    ["Dead Wood Tree"] = 250,
+    ["Star Wood Tree"] = 270,
+}
+
+local woodLootNodes = {
+    ["Simple Wood"] = "Simple Wood Tree",
+    ["Bright Wood"] = "Bright Wood Tree",
+    ["Shade Wood"] = "Shade Wood Tree",
+    ["Tropical Wood"] = "Tropical Wood Tree",
+    ["Star Wood"] = "Star Wood Tree",
+}
+
 local resourceSkills = {
     herb = "Herbalism",
     mineral = "Mining",
     skin = "Skinning",
     lock = "Lockpicking",
+    wood = "Survival",
 }
 
 local iconRoot = "Interface\\AddOns\\OctoGather\\Icons\\"
@@ -257,11 +275,21 @@ local skinIcons = {
     ["Pristine Hide of the Beast"] = "Interface\\Icons\\INV_Misc_MonsterScales_15",
 }
 
+local woodIcons = {
+    ["Simple Wood Tree"] = "Interface\\Icons\\simple_wood_1",
+    ["Bright Wood Tree"] = "Interface\\Icons\\oak_wood_1",
+    ["Shade Wood Tree"] = "Interface\\Icons\\pine_wood_1",
+    ["Tropical Wood Tree"] = "Interface\\Icons\\tropical_logs_1",
+    ["Dead Wood Tree"] = "Interface\\Icons\\star_log_2",
+    ["Star Wood Tree"] = "Interface\\Icons\\star_log_2",
+}
+
 local fallbackIcons = {
     mineral = "Interface\\Icons\\INV_Pick_02",
     skin = "Interface\\Icons\\INV_Misc_LeatherScrap_02",
     lock = "Interface\\Icons\\INV_Misc_Key_03",
     treasure = "Interface\\Icons\\INV_Misc_Chest_01",
+    wood = "Interface\\Icons\\INV_Axe_01",
 }
 
 local colors = {
@@ -298,6 +326,7 @@ local function GetResourceSkillRanks()
         mineral = GetSkillRank("Mining"),
         skin = GetSkillRank("Skinning"),
         lock = GetSkillRank("Lockpicking"),
+        wood = GetSkillRank("Survival"),
     }
 end
 
@@ -328,6 +357,7 @@ local function RequirementFor(kind, name)
     if kind == "herb" then return herbRequirements[name] end
     if kind == "mineral" then return mineralRequirements[name] end
     if kind == "treasure" then return treasureLevels[name] end
+    if kind == "wood" then return treeRequirements[name] end
     return nil
 end
 
@@ -541,6 +571,10 @@ local function ResourceFromLootMessage(message)
     if nodeName then
         return "mineral", nodeName, mineralRequirements[nodeName], texture
     end
+    nodeName = woodLootNodes[name]
+    if nodeName then
+        return "wood", nodeName, treeRequirements[nodeName], texture
+    end
     return nil
 end
 
@@ -548,6 +582,7 @@ local actionKinds = {
     ["Herb Gathering"] = "herb",
     ["Mining"] = "mineral",
     ["Skinning"] = "skin",
+    ["Woodcutting"] = "wood",
     ["Opening"] = "treasure",
     ["Pick Lock"] = "lock",
 }
@@ -576,11 +611,22 @@ local function BeginResourceAction(actionName)
     elseif kind == "skin" then
         name = UnitName("target") or "Skinnable creature"
         required = SkinningRequirement(UnitLevel("target"))
+    elseif kind == "wood" then
+        name, required = ReadNodeTooltip("Survival")
+        required = required or treeRequirements[name]
     else
         name, required = ReadNodeTooltip("Lockpicking")
-        if not IsChestName(name) then return false end
-        if kind == "treasure" and required then kind = "lock" end
-        required = required or RequirementFor(kind, name)
+        if kind == "treasure" and treeRequirements[name] then
+            kind = "wood"
+            local treeName, survivalRequirement = ReadNodeTooltip("Survival")
+            name = treeName or name
+            required = survivalRequirement or treeRequirements[name]
+            -- Some clients report the generic Opening action for trees.
+        else
+            if not IsChestName(name) then return false end
+            if kind == "treasure" and required then kind = "lock" end
+            required = required or RequirementFor(kind, name)
+        end
     end
 
     pendingNode = name
@@ -702,6 +748,7 @@ end
 local function GetResourceIcon(name, kind, texture)
     kind = kind or "herb"
     if kind == "skin" and skinIcons[name] then return skinIcons[name] end
+    if kind == "wood" and woodIcons[name] then return woodIcons[name] end
     if texture then return texture end
     if kind == "herb" then return herbIcons[name] or herbIcons["Peacebloom"] end
     if kind == "mineral" then
@@ -1014,7 +1061,9 @@ end
 
 local function ShowStatus()
     local zones, nodes = 0, 0
-    local counts = { herb = 0, mineral = 0, skin = 0, lock = 0, treasure = 0 }
+    local counts = {
+        herb = 0, mineral = 0, skin = 0, lock = 0, treasure = 0, wood = 0,
+    }
     local _, zoneNodes
     for _, zoneNodes in pairs(OctoGatherDB.nodes) do
         zones = zones + 1
@@ -1036,9 +1085,11 @@ local function ShowStatus()
     Print((OctoGatherDB.enabled and "markers enabled" or "markers hidden") .. "; " ..
         nodes .. " locations in " .. zones .. " zones (herbs " .. counts.herb ..
         ", minerals " .. counts.mineral .. ", skins " .. counts.skin ..
+        ", trees " .. counts.wood ..
         ", chests " .. (counts.lock + counts.treasure) .. ").")
     Print("skills: Herbalism " .. GetSkillRank("Herbalism") .. ", Mining " ..
         GetSkillRank("Mining") .. ", Skinning " .. GetSkillRank("Skinning") ..
+        ", Survival " .. GetSkillRank("Survival") ..
         ", Lockpicking " .. GetSkillRank("Lockpicking") .. ".")
     if continent and zone then
         Print("current map " .. continent .. ":" .. zone .. " (" .. zoneName .. ") has " .. currentNodes ..
@@ -1080,7 +1131,8 @@ frame:SetScript("OnEvent", function()
         local _, _, actionName, gatheredName =
             string.find(arg1, "^You perform (.+) on (.+)%.$")
         local kind = actionKinds[actionName]
-        if kind == "herb" or kind == "mineral" then
+        if treeRequirements[gatheredName] then kind = "wood" end
+        if kind == "herb" or kind == "mineral" or kind == "wood" then
             local required = RequirementFor(kind, gatheredName)
             if pendingNode == gatheredName and pendingRequirement then
                 required = pendingRequirement
