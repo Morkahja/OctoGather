@@ -5,6 +5,7 @@ local MAX_PINS = 300
 local UPDATE_INTERVAL = 0.10
 local DUPLICATE_DISTANCE = 0.004 -- 0.4 map percentage points, as used by classic Gatherer.
 local CORNER_DOT_SIZE = 3
+local GRAY_MARKER_OPACITY = 0.85
 
 local frame = CreateFrame("Frame", "OctoGatherFrame")
 local pins = {}
@@ -942,7 +943,7 @@ local function UpdatePins()
         local pin = AcquirePin(i)
         SetMarkerNames(pin, group.names)
         SetPinColor(pin, colors[group.difficulty])
-        pin:SetAlpha(group.difficulty == "gray" and 0.5 or 1.0)
+        pin:SetAlpha(group.difficulty == "gray" and GRAY_MARKER_OPACITY or 1.0)
         SetPinBounds(pin, group.left, group.right, group.bottom, group.top)
         pin:Show()
     end
@@ -993,7 +994,7 @@ local function UpdateWorldMapPins()
         SetMarkerNames(pin, group.names)
         pin.icon:SetTexture(group.iconTexture)
         SetPinColor(pin, colors[group.difficulty])
-        pin:SetAlpha(group.difficulty == "gray" and 0.5 or 1.0)
+        pin:SetAlpha(group.difficulty == "gray" and GRAY_MARKER_OPACITY or 1.0)
         SetPinBounds(pin, group.left, group.right, group.bottom, group.top,
             WorldMapButton, "TOPLEFT")
         pin:Show()

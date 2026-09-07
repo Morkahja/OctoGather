@@ -90,8 +90,9 @@ Ordinary treasure chests use the same progression idea with character level:
 red is well above your level, yellow is around your level, green is below it,
 and gray is at least ten levels below it.
 
-Gray markers use 50% opacity on both maps so low-value locations remain visible
-without overwhelming the display. All other colors use full opacity.
+Gray markers use 85% opacity on both maps so low-value locations remain
+slightly subdued without becoming difficult to see. All other colors use full
+opacity.
 
 ## Commands
 

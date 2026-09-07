@@ -2,7 +2,7 @@
 ## Title: Octo Gather
 ## Notes: Learns herbs, minerals, trees, skins, and chests and colors their map markers.
 ## Author: Local
-## Version: 0.4.1
+## Version: 0.4.2
 ## SavedVariables: OctoGatherDB
 ## OptionalDeps: Interact
 
