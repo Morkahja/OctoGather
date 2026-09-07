@@ -3,8 +3,8 @@
 Octo Gather is a self-learning resource map overlay for OctoWoW and Vanilla
 WoW 1.12. It remembers successfully gathered herbs, minerals, and Survival
 trees, plus skinning results, lockpicking practice chests, and ordinary treasure
-chests. Saved locations appear as difficulty-colored outlines on the minimap
-and as resource icons with colored outlines on the world map.
+chests. Saved locations appear as four difficulty-colored corner dots on the
+minimap and as resource icons framed by matching corner dots on the world map.
 
 Locations are saved account-wide in `OctoGatherDB`, so every character can use
 the same database and the locations remain available after logout or `/reload`.
@@ -39,7 +39,7 @@ the same database and the locations remain available after logout or `/reload`.
   and compares the skinned creature's requirement with Skinning. These markers
   are hunting spots rather than exact spawn points because creatures move. The
   requirement follows Vanilla's low-level and high-level creature formulas, so
-  the outline changes as the character's Skinning skill increases. Known
+  the corner color changes as the character's Skinning skill increases. Known
   Vanilla leathers and hides always use their exact inventory icons, even when
   the client has not cached the looted item's texture yet.
 - **Lockpicking:** saves world chests that expose a Lockpicking requirement and
@@ -52,29 +52,30 @@ the same database and the locations remain available after logout or `/reload`.
 
 ### Minimap
 
-The minimap displays an empty colored outline at every saved location currently
-in range. Move the mouse over an outline to see the resource name beside the
-cursor.
+The minimap displays four small colored corner dots at every saved location
+currently in range. Move the mouse inside the corners to see the resource name
+beside the cursor.
 
 ![A Firebloom marker and tooltip on the minimap](Screenshots/minimap-tooltip.png)
 
 ### World map
 
-The selected zone's world map displays the resource icon inside
-each colored outline. Move the mouse over a marker to see its resource name. Use the
+The selected zone's world map displays the resource icon between four colored
+corner dots. Move the mouse over a marker to see its resource name. Use the
 **Octo Gather** checkbox in the upper-left corner of the world map to show or
 hide the overlay; the setting is saved account-wide.
 
 Nearby markers for the same resource merge into a larger rectangular marker
-when their outlines overlap. Different resources remain separate and may
-overlap, preventing unrelated locations from merging into oversized frames.
+when their bounds overlap; its four dots move to the outer corners. Different
+resources remain separate and may overlap, preventing unrelated locations from
+merging into oversized markers.
 
 ![Merged same-herb markers on the world map](Screenshots/world-map-merged-markers.png)
 
 ## Difficulty colors
 
-For professions, the outline compares the saved requirement with your current
-skill:
+For professions, the corner color compares the saved requirement with your
+current skill:
 
 | Color | Meaning |
 | --- | --- |

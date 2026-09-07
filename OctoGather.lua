@@ -4,6 +4,7 @@ local ADDON = "Octo Gather"
 local MAX_PINS = 300
 local UPDATE_INTERVAL = 0.10
 local DUPLICATE_DISTANCE = 0.004 -- 0.4 map percentage points, as used by classic Gatherer.
+local CORNER_DOT_SIZE = 3
 
 local frame = CreateFrame("Frame", "OctoGatherFrame")
 local pins = {}
@@ -740,9 +741,15 @@ local function SetMarkerNames(pin, names)
     if hoveredPin == pin then ShowMarkerTooltip(pin) end
 end
 
-local function AddSolidEdge(pin)
+local function AddCornerDot(pin)
     local texture = pin:CreateTexture(nil, "OVERLAY")
     table.insert(pin.edges, texture)
+end
+
+local function SizeCornerDot(dot)
+    dot:ClearAllPoints()
+    dot:SetWidth(CORNER_DOT_SIZE)
+    dot:SetHeight(CORNER_DOT_SIZE)
 end
 
 local function GetResourceIcon(name, kind, texture)
@@ -764,24 +771,16 @@ local function SetPinBounds(pin, left, right, bottom, top, anchorParent, anchorP
     pin:SetWidth(width)
     pin:SetHeight(height)
 
-    local topEdge, bottomEdge, leftEdge, rightEdge =
+    local topLeftDot, topRightDot, bottomLeftDot, bottomRightDot =
         pin.edges[1], pin.edges[2], pin.edges[3], pin.edges[4]
-    topEdge:ClearAllPoints()
-    topEdge:SetPoint("TOPLEFT", pin, "TOPLEFT", 0, 0)
-    topEdge:SetPoint("TOPRIGHT", pin, "TOPRIGHT", 0, 0)
-    topEdge:SetHeight(2)
-    bottomEdge:ClearAllPoints()
-    bottomEdge:SetPoint("BOTTOMLEFT", pin, "BOTTOMLEFT", 0, 0)
-    bottomEdge:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", 0, 0)
-    bottomEdge:SetHeight(2)
-    leftEdge:ClearAllPoints()
-    leftEdge:SetPoint("TOPLEFT", pin, "TOPLEFT", 0, 0)
-    leftEdge:SetPoint("BOTTOMLEFT", pin, "BOTTOMLEFT", 0, 0)
-    leftEdge:SetWidth(2)
-    rightEdge:ClearAllPoints()
-    rightEdge:SetPoint("TOPRIGHT", pin, "TOPRIGHT", 0, 0)
-    rightEdge:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", 0, 0)
-    rightEdge:SetWidth(2)
+    SizeCornerDot(topLeftDot)
+    SizeCornerDot(topRightDot)
+    SizeCornerDot(bottomLeftDot)
+    SizeCornerDot(bottomRightDot)
+    topLeftDot:SetPoint("TOPLEFT", pin, "TOPLEFT", 0, 0)
+    topRightDot:SetPoint("TOPRIGHT", pin, "TOPRIGHT", 0, 0)
+    bottomLeftDot:SetPoint("BOTTOMLEFT", pin, "BOTTOMLEFT", 0, 0)
+    bottomRightDot:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", 0, 0)
 
     anchorParent = anchorParent or Minimap
     anchorPoint = anchorPoint or "CENTER"
@@ -804,10 +803,10 @@ local function AcquirePin(index)
         pin:SetFrameLevel(Minimap:GetFrameLevel() + 5)
     end
     pin.edges = {}
-    AddSolidEdge(pin)
-    AddSolidEdge(pin)
-    AddSolidEdge(pin)
-    AddSolidEdge(pin)
+    AddCornerDot(pin)
+    AddCornerDot(pin)
+    AddCornerDot(pin)
+    AddCornerDot(pin)
     pins[index] = pin
     EnableMarkerTooltip(pin)
     return pin
@@ -824,10 +823,10 @@ local function AcquireWorldPin(index)
     pin.icon:SetPoint("BOTTOMRIGHT", pin, "BOTTOMRIGHT", -2, 2)
     pin.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     pin.edges = {}
-    AddSolidEdge(pin)
-    AddSolidEdge(pin)
-    AddSolidEdge(pin)
-    AddSolidEdge(pin)
+    AddCornerDot(pin)
+    AddCornerDot(pin)
+    AddCornerDot(pin)
+    AddCornerDot(pin)
     worldPins[index] = pin
     EnableMarkerTooltip(pin)
     return pin
