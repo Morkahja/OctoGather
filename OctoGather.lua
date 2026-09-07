@@ -22,7 +22,6 @@ local lastRecordedName = nil
 local lastRecordedKind = nil
 local lastRecordedTime = 0
 local lastInteractTime = 0
-local originalInteract = nil
 local interactWrapper = nil
 
 -- Zone-name lookup is intentional. OctoWoW inserts extra maps, so its numeric
@@ -555,7 +554,9 @@ end
 local function InstallInteractHook()
     if type(Interact) ~= "function" or Interact == interactWrapper then return end
     -- Wrap the newest implementation if Interact or another addon replaces it.
-    originalInteract = Interact
+    -- Capture a separate predecessor for each wrapper. A shared variable would
+    -- redirect older wrappers into newer hooks and create a recursive loop.
+    local originalInteract = Interact
     interactWrapper = function(autoloot)
         lastInteractTime = GetTime()
         return originalInteract(autoloot)
